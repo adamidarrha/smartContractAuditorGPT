@@ -1,0 +1,50 @@
+name: Deploy to AWS
+
+on:
+  push:
+    branches:
+      - main  # Set to your deployment branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.x'  # Set to your Python version
+
+    - name: Run Flask Application
+      run: |
+        # Add commands to start your Flask application
+        FLASK_APP=app.py FLASK_ENV=development flask run &
+        # Add a sleep command to give Flask time to start
+        sleep 10
+    
+    - name: Test Flask Application
+      run: |
+        # Test the /api/v1/tags/ endpoint -f tells it to return non zero code if there is error with req
+        curl -f http://localhost:5000/api/v1/tags/
+
+    - name: Deploy to AWS
+      if: success()  #Proceed if all previous steps were successful  
+      env:
+        AWS_SSH_PRIVATE_KEY: ${{ secrets.AWS_SSH_PRIVATE_KEY }}
+        HOST: ${{ secrets.HOST }}
+        USERNAME: ${{ secrets.USERNAME }}
+      run: |
+        # Install SSH client
+        sudo apt-get update
+        sudo apt-get install -y openssh-client
+        # Setup SSH key
+        mkdir -p ~/.ssh
+        echo "$AWS_SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        # Disable SSH host key checking
+        echo "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+        # SSH and deploy
+        ssh $USERNAME@$HOST 'bash -s' < deploy_script.sh
