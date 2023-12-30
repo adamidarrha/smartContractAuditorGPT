@@ -165,4 +165,4 @@ apiWrapperView = ApiWrapperView.as_view('ApiWrapperView')
 app.add_url_rule('/api/v1/<endpoint>/', view_func=apiWrapperView)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=True)
