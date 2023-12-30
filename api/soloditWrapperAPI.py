@@ -67,7 +67,6 @@ class Request:
         url = self.baseApiUrl + endpoint
         headers = self.AuthHeader
         response = requests.get(url, headers=headers, params=params)
-        print(url, endpoint)
         return response
         
     def check(self, response: requests.Response):
