@@ -7,9 +7,8 @@ import pathlib
 
 app = Flask(__name__)
 
-#TO DO: if the content is long and there is resume just give resume.
-#TO DO: remove pdf's content if they have resume return if not remove
 #TO DO add logic to handle big contents and files by ommiting them
+#TO DO add logic to only give certain number of issues and not too much
 
 # Determine the path to the directory containing the .env file
 env_path = pathlib.Path('..') / '.env'  # Adjust the path according to your directory structure
@@ -26,10 +25,21 @@ class Request:
     DEFAULT_AUTHORIZATION_HEADER = {
         'Authorization': f'Token {solodit_auth_token}' # Replace with your actual authorization token
     }
+    #allowlisted enpoints
+    DEFAULT_VALID_ENDPOINTS=["issues", "tags", "protocols/categories", "auditfirms"]
 
-    def __init__(self, BaseApiUrl : str = DEFAULT_BASE_API_URL, AuthHeader : dict = DEFAULT_AUTHORIZATION_HEADER):
+    def __init__(self, 
+                 BaseApiUrl : str = DEFAULT_BASE_API_URL, 
+                 AuthHeader : dict = DEFAULT_AUTHORIZATION_HEADER,
+                 validEndpoints : list = DEFAULT_VALID_ENDPOINTS):
         self.baseApiUrl = BaseApiUrl
         self.AuthHeader = AuthHeader
+        self.validEndpoints = validEndpoints
+
+    def validEndpoint(self, endpoint):
+        if(endpoint in self.validEndpoints):
+            return True
+        return False
 
     def issuesEndpoint(self, endpoint, params):
         if(endpoint == "issues"):
@@ -104,18 +114,23 @@ class Request:
         fields_to_remove = [
             "bookmarked", 
             "bookmarked_total",
-            "content",
+            "change_logs",
             "contest_link", 
             "contest_prize_txt", 
             "editor_comments",
+            "finder_list",
             "general_score",
+            "finders_count",
             "github_dicussion_no",
             "github_link",
             "id",
             "issue_source",
+            "kind",
             "markasread",
+            "openai_explained",
             "pdf_link",
             "pdf_page_from",
+            "quality_score",
             "slug",
             "sponsor_name",
             "user_note"
@@ -126,7 +141,28 @@ class Request:
         for issue in response["results"]:
             # Create a copy of the firm's dictionary
             issueCopy = issue.copy()
-            # Remove unwanted fields
+
+            #remove id from issueProtocol
+            issueCopy["issue_protocol"].pop("id", None)
+
+            #if there is a resume or content too long give resume and not content
+            if(issue["openai_explained"] or len(issue["content"]) > 500):
+                issueCopy.pop("content", None)
+
+            #if tags_list is empty remove
+            if(len(issue["tag_list"]) == 0):
+                issueCopy.pop("tag_list", None)
+
+            #if issueProtocols category list empty remove
+            if(len(issue["issue_protocol"]["category_list"]) == 0):
+                issueCopy["issue_protocol"].pop("category_list", None)
+
+            #keep only title for similar issues
+            for similarIssue in issueCopy["similar_issue_list"]:
+                similarIssue.pop("id", None)
+                similarIssue.pop("slug", None)
+
+            # Remove unwanted fields according to the fields_to_remove array
             for field in fields_to_remove:
                 issueCopy.pop(field, None)  # Use pop to remove the field, 'None' ensures no error if the field does not exist
             formattedData.append(issueCopy)
@@ -134,6 +170,10 @@ class Request:
         return formattedData
 
     def result(self, endpoint, params=None):
+        #check if endpoint is in the allowlist
+        if(not self.validEndpoint(endpoint)):
+            return {"error": 
+                    f"the endpoint {endpoint} is not valid here are the valid endpoints: {self.validEndpoints}"}
         #check if endpoint is /issues to make the correct request
         endpoint, params = self.issuesEndpoint(endpoint, params)
         
