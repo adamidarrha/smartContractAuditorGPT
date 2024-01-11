@@ -6,4 +6,4 @@ gets example issues from solodit, through a wrapper .
 
 # endpoints:
 
-/api/v1/
+/api/v1/auditfirms
